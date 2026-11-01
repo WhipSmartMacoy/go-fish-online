@@ -3,53 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Go Fish Online</title>
+<title>Gin Rummy Online</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, sans-serif; background: #0f5132; color: #f4f4f4; min-height: 100vh; }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
-  h1 { margin: 0 0 12px; font-size: 26px; }
-  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  :root { --cw: clamp(42px, 10.5vw, 68px); --ch: calc(var(--cw) * 1.42); }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #2b1d14; color: #f4f4f4; min-height: 100vh;
+         background-image: radial-gradient(circle at 50% 30%, #3d2a1c, #1d130c 75%); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 14px; }
+  h1 { margin: 0 0 12px; font-size: 24px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
   input { padding: 9px 11px; border-radius: 6px; border: none; font-size: 16px; }
   #code { text-transform: uppercase; width: 130px; letter-spacing: .15em; }
-  button { padding: 9px 15px; border-radius: 6px; border: none; font-size: 15px; cursor: pointer; background: #ffc107; color: #222; font-weight: 600; }
+  button { padding: 9px 15px; border-radius: 6px; border: none; font-size: 15px; cursor: pointer; background: #ffc107; color: #222; font-weight: 700; }
   button.secondary { background: rgba(255,255,255,.18); color: #fff; }
-  button:disabled { opacity: .45; cursor: default; }
-  .panel { background: rgba(0,0,0,.25); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+  button.knock { background: #ff7043; color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  .panel { background: rgba(0,0,0,.3); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
   .panel h2 { margin: 0 0 10px; font-size: 18px; }
   .or { opacity: .7; margin: 14px 0 10px; }
-  .msg { background: rgba(0,0,0,.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 16px; }
-  .msg.you { background: #ffc107; color: #222; font-weight: 600; }
-  .room { font-size: 15px; }
-  .room b { letter-spacing: .15em; font-size: 20px; }
-  .players { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-  .player { background: rgba(0,0,0,.25); border: 2px solid transparent; border-radius: 10px; padding: 10px 12px; min-width: 140px; }
-  .player.turn { border-color: #ffc107; }
-  .player.pickable { cursor: pointer; background: rgba(255,255,255,.12); }
-  .player.pickable:hover, .player.selected { border-color: #fff; background: rgba(255,255,255,.22); }
-  .player .name { font-weight: 700; }
-  .player .info { font-size: 13px; opacity: .85; margin-top: 4px; }
-  .section-title { font-size: 14px; opacity: .8; margin: 6px 0; text-transform: uppercase; letter-spacing: .05em; }
-  .hand { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; min-height: 92px; }
-  .card { width: 60px; height: 86px; background: #fff; color: #222; border-radius: 7px; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 6px; font-weight: 700; font-size: 17px; box-shadow: 0 2px 4px rgba(0,0,0,.3); user-select: none; border: 3px solid transparent; }
-  .card .suit { align-self: flex-end; font-size: 22px; }
-  .card.red { color: #c62828; }
-  .card.clickable { cursor: pointer; }
-  .card.clickable:hover { transform: translateY(-4px); }
-  .card.selected { border-color: #ffc107; transform: translateY(-6px); }
-  .log { background: rgba(0,0,0,.25); border-radius: 8px; padding: 10px 14px; height: 180px; overflow-y: auto; font-size: 14px; line-height: 1.5; }
-  .rules { font-size: 13px; opacity: .8; margin-top: 14px; line-height: 1.5; }
-  .hidden { display: none !important; }
   .err { color: #ffcdd2; margin-top: 10px; min-height: 1.2em; }
+  .hidden { display: none !important; }
+  .room b { letter-spacing: .15em; font-size: 19px; }
+
+  /* ---------- The table ---------- */
+  .table { position: relative; margin: 6px auto 12px; width: 100%; min-height: calc(var(--ch) * 2 + 330px);
+    border-radius: 48% / 36%; border: 16px solid #6b3f1f;
+    background: radial-gradient(ellipse at center, #23905a 0%, #17703f 55%, #0d4f2b 100%);
+    box-shadow: 0 0 0 4px #4a2a12, inset 0 0 50px rgba(0,0,0,.55), 0 18px 40px rgba(0,0,0,.6);
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 18px 10px 22px; overflow: hidden; }
+  .seat { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+  .plate { display: inline-flex; gap: 8px; align-items: center; background: rgba(0,0,0,.4); padding: 5px 12px; border-radius: 20px; font-size: 14px; border: 2px solid transparent; }
+  .plate.turn { border-color: #ffc107; box-shadow: 0 0 12px rgba(255,193,7,.6); }
+  .plate .score { background: #ffc107; color: #222; border-radius: 10px; padding: 1px 8px; font-weight: 800; }
+  .chip { background: #fff; color: #222; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+
+  .fan { display: flex; justify-content: center; align-items: flex-end; min-height: calc(var(--ch) + 14px); padding: 0 10px; }
+  .fan .card { margin-left: calc(var(--cw) * -0.52); transition: transform .15s; }
+  .fan .card:first-child { margin-left: 0; }
+  .fan .card.gap { margin-left: calc(var(--cw) * -0.25); }
+  .fan.mine .card { margin-left: calc(var(--cw) * -0.38); }
+  .fan.mine .card.gap { margin-left: calc(var(--cw) * 0.12); }
+  .fan.mine .card:first-child { margin-left: 0; }
+
+  .center { display: flex; gap: clamp(18px, 6vw, 48px); align-items: center; justify-content: center; }
+  .pile { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; opacity: .95; }
+  .stack { position: relative; width: var(--cw); height: var(--ch); border-radius: 7px; }
+  .stack.empty { border: 2px dashed rgba(255,255,255,.35); }
+  .stack .card { position: absolute; left: 0; top: 0; }
+  .stack.live { cursor: pointer; }
+  .stack.live .card:last-child { box-shadow: 0 0 0 3px #ffc107, 0 0 18px rgba(255,193,7,.8); }
+  .stack.live:hover .card:last-child { transform: translateY(-4px); }
+  .msg { text-align: center; font-size: 15px; background: rgba(0,0,0,.35); padding: 7px 14px; border-radius: 18px; max-width: 90%; }
+  .msg.you { background: #ffc107; color: #222; font-weight: 700; }
+
+  /* ---------- Cards ---------- */
+  .card { width: var(--cw); height: var(--ch); background: #fff; color: #222; border-radius: 7px; flex: none;
+    display: flex; flex-direction: column; justify-content: space-between; padding: 4px 5px; font-weight: 800;
+    font-size: calc(var(--cw) * 0.27); box-shadow: -1px 1px 4px rgba(0,0,0,.45); user-select: none; position: relative; border: 2px solid #ddd; }
+  .card .corner { line-height: 1; text-align: center; align-self: flex-start; font-size: calc(var(--cw) * 0.25); }
+  .card .s2 { align-self: flex-end; font-size: calc(var(--cw) * 0.38); line-height: 1; }
+  .card.red { color: #c62828; }
+  .card.back { background: repeating-linear-gradient(45deg, #b71c1c 0 5px, #d32f2f 5px 10px); border: 3px solid #fff; }
+  .card.meld { background: #fffbe6; border-color: #f2c94c; }
+  .card.new { box-shadow: 0 0 0 3px #4fc3f7, -1px 1px 4px rgba(0,0,0,.45); }
+  .card.clickable { cursor: pointer; }
+  .fan.mine .card.clickable:hover { transform: translateY(-8px) !important; }
+  .card.selected { transform: translateY(-16px) !important; border-color: #ff7043; box-shadow: 0 0 0 3px #ff7043; }
+  .card.layoff { background: #e3f2fd; border-color: #42a5f5; }
+  .card.mini { --cw: 34px; --ch: 48px; padding: 2px 3px; }
+
+  .controls { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 40px; }
+  .dw { font-size: 14px; background: rgba(0,0,0,.35); padding: 6px 12px; border-radius: 16px; }
+
+  /* ---------- End-of-hand overlay ---------- */
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 14px; z-index: 5; }
+  .result { background: #fdf8ec; color: #222; border-radius: 12px; padding: 16px 18px; max-width: 640px; width: 100%; max-height: 100%; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+  .result h3 { margin: 0 0 6px; font-size: 20px; }
+  .result .who { font-weight: 800; margin: 12px 0 4px; }
+  .result .groups { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .result .group { display: flex; gap: 2px; }
+  .result .label { font-size: 12px; opacity: .7; margin-top: 2px; }
+  .result .scores { margin: 12px 0; font-size: 15px; }
+  .log { background: rgba(0,0,0,.3); border-radius: 8px; padding: 8px 12px; height: 110px; overflow-y: auto; font-size: 13px; line-height: 1.5; }
+  .rules { font-size: 13px; opacity: .8; margin-top: 12px; line-height: 1.5; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🐟 Go Fish Online</h1>
+  <h1>🃏 Gin Rummy Online</h1>
 
-  <!-- Lobby: create or join a game -->
   <div id="lobby" class="panel">
-    <h2>Play with friends</h2>
+    <h2>Play a friend</h2>
     <div class="bar"><input id="name" placeholder="Your name" maxlength="16"></div>
     <div class="bar"><button id="create">Create a game</button></div>
     <div class="or">or join a friend's game:</div>
@@ -60,65 +104,156 @@
     <div id="lobbyErr" class="err"></div>
   </div>
 
-  <!-- Table -->
-  <div id="table" class="hidden">
+  <div id="game" class="hidden">
     <div class="bar room">
       <span>Room code: <b id="roomCode"></b></span>
       <button id="copyLink" class="secondary">Copy invite link</button>
-      <button id="start">Start game</button>
-      <span id="pond"></span>
+      <button id="start">Start match</button>
     </div>
-    <div id="msg" class="msg"></div>
-    <div class="section-title">Players</div>
-    <div id="players" class="players"></div>
-    <div class="section-title">Your hand</div>
-    <div id="hand" class="hand"></div>
-    <div class="bar"><button id="ask" disabled>Ask</button></div>
-    <div class="section-title">What happened</div>
-    <div id="log" class="log"></div>
+
+    <div class="table" id="table">
+      <div class="seat" id="oppSeat">
+        <div id="oppPlate" class="plate"></div>
+        <div id="oppHand" class="fan"></div>
+      </div>
+
+      <div class="center">
+        <div class="pile"><div id="stock" class="stack"></div><span id="stockLabel"></span></div>
+        <div class="pile"><div id="discard" class="stack"></div><span>Discard</span></div>
+      </div>
+      <div id="msg" class="msg"></div>
+
+      <div class="seat">
+        <div id="myHand" class="fan mine"></div>
+        <div class="controls">
+          <span id="dw" class="dw"></span>
+          <button id="discardBtn" disabled>Discard</button>
+          <button id="knockBtn" class="knock" disabled>Knock</button>
+        </div>
+        <div id="myPlate" class="plate"></div>
+      </div>
+
+      <div id="overlay" class="overlay hidden"><div id="result" class="result"></div></div>
+    </div>
+
+    <div class="log" id="log"></div>
   </div>
 
   <div class="rules">
-    <b>How to play:</b> One person creates a game and shares the code or invite link. Once everyone has joined, the creator presses Start.
-    On your turn, click a card in your hand, click another player, then press Ask.
-    If they have that rank, they give you all of them and you go again. If not, you "go fish" and draw a card.
-    Collect all four of a rank to make a book. When all 13 books are made, the player with the most books wins.
-    Keep the creator's tab open: their browser runs the game.
+    <b>How to play:</b> On your turn, draw one card from the face-down pile or take the top discard, then pick a card from your hand to discard.
+    Make <b>melds</b>: sets of 3–4 of the same rank, or runs of 3+ in a row in one suit (ace is low).
+    Cards not in a meld are <b>deadwood</b> (A = 1, face cards = 10). Your melds are shown in yellow automatically.
+    When your deadwood is 10 or less, you can <b>knock</b> to end the hand. 0 deadwood is <b>Gin</b> (+25 bonus).
+    Your opponent can then lay off their loose cards onto your melds. If they end up with equal or less deadwood, they <b>undercut</b> you (+25 to them).
+    First to 100 points wins the match.
   </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 // =====================================================================
-// Networking: the player who creates a game is the HOST. The host's
-// browser runs the game rules and sends each player only their own hand.
-// Other players connect directly to the host with PeerJS (WebRTC).
+// Card helpers and meld finding (used by both players' browsers)
 // =====================================================================
 const $ = (id) => document.getElementById(id);
-const PREFIX = 'gofish-online-';
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUITS = ['♠', '♥', '♦', '♣'];
-const MAX_PLAYERS = 6;
+const ri = (c) => RANKS.indexOf(c.r);
+const val = (c) => Math.min(ri(c) + 1, 10);
+const cid = (c) => c.r + c.s;
+const sum = (cards) => cards.reduce((n, c) => n + val(c), 0);
+const byRank = (a, b) => ri(a) - ri(b) || SUITS.indexOf(a.s) - SUITS.indexOf(b.s);
 
+// Every possible meld in a hand, as lists of indexes.
+function findMelds(hand) {
+  const melds = [], groups = {};
+  hand.forEach((c, i) => (groups[c.r] = groups[c.r] || []).push(i));
+  for (const g of Object.values(groups)) {
+    if (g.length >= 3) melds.push(g.slice());
+    if (g.length === 4) for (let x = 0; x < 4; x++) melds.push(g.filter((_, j) => j !== x));
+  }
+  for (const s of SUITS) {
+    const idx = hand.map((_, i) => i).filter(i => hand[i].s === s).sort((a, b) => ri(hand[a]) - ri(hand[b]));
+    let start = 0;
+    for (let j = 1; j <= idx.length; j++) {
+      if (j === idx.length || ri(hand[idx[j]]) !== ri(hand[idx[j - 1]]) + 1) {
+        const seq = idx.slice(start, j);
+        for (let a = 0; a < seq.length; a++) for (let b = a + 3; b <= seq.length; b++) melds.push(seq.slice(a, b));
+        start = j;
+      }
+    }
+  }
+  return melds;
+}
+
+// The arrangement of melds that leaves the least deadwood.
+function best(hand) {
+  const melds = findMelds(hand).map(m => ({ m, mask: m.reduce((x, i) => x | (1 << i), 0) }));
+  const memo = new Map();
+  function f(mask) {
+    if (!mask) return { dw: 0, pick: [] };
+    if (memo.has(mask)) return memo.get(mask);
+    let i = 0; while (!((mask >> i) & 1)) i++;
+    const skip = f(mask & ~(1 << i));
+    let res = { dw: skip.dw + val(hand[i]), pick: skip.pick };
+    for (const md of melds) {
+      if (((md.mask >> i) & 1) && (md.mask & mask) === md.mask) {
+        const r = f(mask & ~md.mask);
+        if (r.dw < res.dw) res = { dw: r.dw, pick: [md.m, ...r.pick] };
+      }
+    }
+    memo.set(mask, res); return res;
+  }
+  const r = f((1 << hand.length) - 1);
+  const used = new Set(r.pick.flat());
+  return {
+    dw: r.dw,
+    melds: r.pick.map(m => m.map(i => hand[i]).sort(byRank)),
+    deadwood: hand.filter((_, i) => !used.has(i)).sort(byRank)
+  };
+}
+
+// Defender adds loose cards onto the knocker's melds where they fit.
+function layOff(knockerMelds, deadwood) {
+  const melds = knockerMelds.map(m => m.slice()), dw = deadwood.slice(), laid = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let k = 0; k < dw.length && !changed; k++) {
+      const c = dw[k];
+      for (const m of melds) {
+        const isSet = m.every(x => x.r === m[0].r);
+        let ok = false;
+        if (isSet) { if (m.length < 4 && c.r === m[0].r) { m.push(c); ok = true; } }
+        else if (c.s === m[0].s) {
+          const lo = Math.min(...m.map(ri)), hi = Math.max(...m.map(ri));
+          if (ri(c) === lo - 1) { m.unshift(c); ok = true; }
+          else if (ri(c) === hi + 1) { m.push(c); ok = true; }
+        }
+        if (ok) { laid.push(cid(c)); dw.splice(k, 1); changed = true; break; }
+      }
+    }
+  }
+  return { melds, deadwood: dw, laid };
+}
+
+// =====================================================================
+// Networking: the creator HOSTS. Their browser runs the rules and sends
+// each player only their own cards. The guest connects with PeerJS.
+// =====================================================================
+const PREFIX = 'ginrummy-online-';
 let peer = null, isHost = false, roomCode = '', hostConn = null;
-let view = null, pickRank = null, pickTarget = null;
+let view = null, selected = null, prevHand = [];
 
 const myName = () => ($('name').value.trim() || 'Player').slice(0, 16);
 const randomCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
-
-// Pre-fill the code from an invite link like ...?room=ABCDE
 const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) $('code').value = urlRoom.toUpperCase();
-try { $('name').value = localStorage.getItem('gofish-name') || ''; } catch {}
-const saveName = () => { try { localStorage.setItem('gofish-name', myName()); } catch {} };
-
+try { $('name').value = localStorage.getItem('gin-name') || ''; } catch {}
+const saveName = () => { try { localStorage.setItem('gin-name', myName()); } catch {} };
 function lobbyError(t) { $('lobbyErr').textContent = t; $('create').disabled = $('join').disabled = false; }
-
-function showTable() {
-  $('lobby').classList.add('hidden');
-  $('table').classList.remove('hidden');
-  $('roomCode').textContent = roomCode;
-  history.replaceState(null, '', '?room=' + roomCode);
+function showGame() {
+  $('lobby').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('roomCode').textContent = roomCode; history.replaceState(null, '', '?room=' + roomCode);
 }
 
 $('create').onclick = () => {
@@ -126,11 +261,7 @@ $('create').onclick = () => {
   saveName(); $('create').disabled = $('join').disabled = true; $('lobbyErr').textContent = 'Creating game…';
   roomCode = randomCode();
   peer = new Peer(PREFIX + roomCode);
-  peer.on('open', () => {
-    isHost = true; $('lobbyErr').textContent = '';
-    host.addPlayer('host', myName(), null);
-    showTable(); host.broadcast();
-  });
+  peer.on('open', () => { isHost = true; $('lobbyErr').textContent = ''; host.addPlayer('host', myName(), null); showGame(); host.broadcast(); });
   peer.on('connection', (conn) => host.onConnection(conn));
   peer.on('error', (e) => {
     if (e.type === 'unavailable-id') { peer.destroy(); $('create').disabled = false; return $('create').click(); }
@@ -144,178 +275,168 @@ $('join').onclick = () => {
   const code = $('code').value.trim().toUpperCase();
   if (code.length !== 5) return lobbyError('Enter the 5-letter code from your friend.');
   saveName(); $('create').disabled = $('join').disabled = true; $('lobbyErr').textContent = 'Joining…';
-  roomCode = code;
-  peer = new Peer();
+  roomCode = code; peer = new Peer();
   peer.on('open', () => {
     hostConn = peer.connect(PREFIX + code, { reliable: true });
     hostConn.on('open', () => hostConn.send({ type: 'join', name: myName() }));
     hostConn.on('data', (m) => {
       if (m.type === 'error') { lobbyError(m.message); hostConn.close(); return; }
-      if (m.type === 'state') { if ($('table').classList.contains('hidden')) { $('lobbyErr').textContent = ''; showTable(); } view = m; render(); }
+      if (m.type === 'state') { if ($('game').classList.contains('hidden')) { $('lobbyErr').textContent = ''; showGame(); } view = m; render(); }
     });
     hostConn.on('close', () => {
-      if (!$('table').classList.contains('hidden')) { $('msg').className = 'msg'; $('msg').textContent = 'The host left, so the game ended. Refresh to start a new one.'; disableAll(); }
+      if (!$('game').classList.contains('hidden')) {
+        $('msg').className = 'msg'; $('msg').textContent = 'Your opponent (the host) left. Refresh to start a new game.';
+        for (const b of document.querySelectorAll('#game button')) b.disabled = true;
+      }
     });
   });
-  peer.on('error', (e) => {
-    if (e.type === 'peer-unavailable') lobbyError('No game found with that code. Check it and try again.');
-    else lobbyError('Connection problem: ' + e.type);
-  });
+  peer.on('error', (e) => lobbyError(e.type === 'peer-unavailable' ? 'No game found with that code. Check it and try again.' : 'Connection problem: ' + e.type));
 };
 
-// Send an action: the host handles its own actions directly.
 function act(msg) {
-  if (isHost) { host.handle('host', msg); }
+  if (isHost) host.handle('host', msg);
   else if (hostConn && hostConn.open) hostConn.send(msg);
 }
 
 $('start').onclick = () => act({ type: 'start' });
-$('ask').onclick = () => { if (pickRank && pickTarget) act({ type: 'ask', rank: pickRank, targetId: pickTarget }); pickRank = pickTarget = null; };
 $('copyLink').onclick = async () => {
   const link = location.origin + location.pathname + '?room=' + roomCode;
-  try { await navigator.clipboard.writeText(link); $('copyLink').textContent = 'Copied!'; }
-  catch { prompt('Copy this link:', link); }
+  try { await navigator.clipboard.writeText(link); $('copyLink').textContent = 'Copied!'; } catch { prompt('Copy this link:', link); }
   setTimeout(() => $('copyLink').textContent = 'Copy invite link', 1500);
 };
-function disableAll() { for (const b of document.querySelectorAll('#table button')) b.disabled = true; }
+$('stock').onclick = () => { if (canDraw()) act({ type: 'draw', from: 'stock' }); };
+$('discard').onclick = () => { if (canDraw() && view.discardTop) act({ type: 'draw', from: 'discard' }); };
+$('discardBtn').onclick = () => { if (selected) act({ type: 'discard', card: selected, knock: false }); selected = null; };
+$('knockBtn').onclick = () => { if (selected) act({ type: 'discard', card: selected, knock: true }); selected = null; };
+$('result').onclick = (e) => { if (e.target.id === 'nextBtn') act({ type: 'next' }); };
+const myTurn = () => view && view.started && !view.result && view.turnId === view.you;
+const canDraw = () => myTurn() && view.phase === 'draw';
 
 // =====================================================================
 // Game rules — run only in the host's browser.
 // =====================================================================
+const TARGET = 100;
 const host = {
-  players: [], deck: [], turn: 0, started: false, winnerText: '', log: [], nextId: 1,
+  players: [], stock: [], pile: [], turn: 0, dealer: 0, phase: 'draw', cantDiscard: null,
+  started: false, result: null, matchOver: false, log: [],
 
   addLog(t) { this.log.push(t); if (this.log.length > 40) this.log.shift(); },
-  addPlayer(id, name, conn) { this.players.push({ id, name, conn, hand: [], books: [] }); this.addLog(`${name} joined.`); },
+  addPlayer(id, name, conn) { this.players.push({ id, name, conn, hand: [], score: 0 }); this.addLog(`${name} sat down.`); },
 
   onConnection(conn) {
     conn.on('data', (m) => {
       if (m.type === 'join') {
         if (conn.playerId) return;
-        if (this.started) { conn.send({ type: 'error', message: 'That game has already started. Ask the host to start a new one after it ends.' }); return; }
-        if (this.players.length >= MAX_PLAYERS) { conn.send({ type: 'error', message: 'That game is full (6 players).' }); return; }
-        conn.playerId = 'p' + this.nextId++;
-        this.addPlayer(conn.playerId, String(m.name || 'Player').slice(0, 16), conn);
+        if (this.players.length >= 2) { conn.send({ type: 'error', message: 'That table is full. Gin Rummy is for 2 players.' }); return; }
+        conn.playerId = 'guest';
+        this.addPlayer('guest', String(m.name || 'Player').slice(0, 16), conn);
         this.broadcast();
-      } else if (conn.playerId) {
-        this.handle(conn.playerId, m);
-      }
+      } else if (conn.playerId) this.handle(conn.playerId, m);
     });
     conn.on('close', () => {
       const idx = this.players.findIndex(p => p.id === conn.playerId);
       if (idx === -1) return;
       const [p] = this.players.splice(idx, 1);
-      this.addLog(`${p.name} left.`);
-      if (this.started) {
-        this.started = false; this.winnerText = '';
-        for (const o of this.players) { o.hand = []; o.books = []; }
-        this.addLog('Game stopped because a player left. Press Start to play again.');
-      }
+      this.addLog(`${p.name} left the table.`);
+      this.started = false; this.result = null;
+      for (const o of this.players) { o.hand = []; o.score = 0; }
       this.broadcast();
     });
   },
 
-  handle(playerId, m) {
-    const p = this.players.find(x => x.id === playerId);
-    if (!p) return;
-    if (m.type === 'start' && playerId === 'host' && !this.started && this.players.length >= 2) this.startGame();
-    if (m.type === 'ask') this.ask(p, m.targetId, m.rank);
+  handle(id, m) {
+    const p = this.players.find(x => x.id === id); if (!p) return;
+    if (m.type === 'start' && id === 'host' && !this.started && this.players.length === 2) this.startMatch();
+    if (m.type === 'next' && id === 'host' && this.result) { this.matchOver ? this.startMatch() : (this.dealer = 1 - this.dealer, this.deal()); }
+    if (m.type === 'draw') this.draw(p, m.from);
+    if (m.type === 'discard') this.discard(p, m.card, m.knock);
     this.broadcast();
   },
 
-  newDeck() {
+  startMatch() {
+    for (const p of this.players) p.score = 0;
+    this.started = true; this.matchOver = false; this.log = [];
+    this.dealer = Math.floor(Math.random() * 2);
+    this.addLog('New match! First to 100 points wins.');
+    this.deal();
+  },
+
+  deal() {
     const d = [];
-    for (const r of RANKS) for (const s of SUITS) d.push({ rank: r, suit: s });
+    for (const r of RANKS) for (const s of SUITS) d.push({ r, s });
     for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
-    return d;
+    for (const p of this.players) p.hand = d.splice(0, 10);
+    this.pile = [d.pop()]; this.stock = d;
+    this.turn = 1 - this.dealer; this.phase = 'draw'; this.cantDiscard = null; this.result = null;
+    this.addLog(`${this.players[this.dealer].name} deals. ${this.players[this.turn].name} goes first.`);
   },
-  sortHand(h) { h.sort((a, b) => RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank)); },
-  checkBooks(p) {
-    for (const r of RANKS) {
-      if (p.hand.filter(c => c.rank === r).length === 4) {
-        p.hand = p.hand.filter(c => c.rank !== r);
-        p.books.push(r);
-        this.addLog(`📚 ${p.name} completed a book of ${r}s!`);
+
+  draw(p, from) {
+    if (!this.started || this.result || this.players[this.turn] !== p || this.phase !== 'draw') return;
+    if (from === 'discard' && this.pile.length) {
+      const c = this.pile.pop(); p.hand.push(c); this.cantDiscard = cid(c);
+      this.addLog(`${p.name} took the ${cid(c)} from the discard pile.`);
+    } else if (from === 'stock' && this.stock.length) {
+      p.hand.push(this.stock.pop()); this.cantDiscard = null;
+      this.addLog(`${p.name} drew from the deck.`);
+    } else return;
+    this.phase = 'discard';
+  },
+
+  discard(p, cardId, knock) {
+    if (!this.started || this.result || this.players[this.turn] !== p || this.phase !== 'discard') return;
+    const i = p.hand.findIndex(c => cid(c) === cardId);
+    if (i === -1 || cardId === this.cantDiscard) return;
+    const rest = p.hand.filter((_, j) => j !== i);
+    if (knock && best(rest).dw > 10) return;
+    const [c] = p.hand.splice(i, 1);
+    this.pile.push(c);
+    if (knock) { this.addLog(`${p.name} discarded the ${cardId} and knocked!`); return this.scoreHand(p); }
+    this.addLog(`${p.name} discarded the ${cardId}.`);
+    if (this.stock.length <= 2) {
+      const reveal = {};
+      for (const q of this.players) { const b = best(q.hand); reveal[q.id] = { melds: b.melds, deadwood: b.deadwood, dw: b.dw }; }
+      this.result = { title: 'No winner this hand', text: 'The deck ran out before anyone knocked, so nobody scores.', reveal, laid: [] };
+      this.addLog('The deck ran out. No score this hand.');
+      return;
+    }
+    this.turn = 1 - this.turn; this.phase = 'draw'; this.cantDiscard = null;
+  },
+
+  scoreHand(knocker) {
+    const def = this.players.find(q => q !== knocker);
+    const kb = best(knocker.hand), db = best(def.hand);
+    const gin = kb.dw === 0;
+    let kMelds = kb.melds, defDead = db.deadwood, laid = [];
+    if (!gin) { const lo = layOff(kb.melds, db.deadwood); kMelds = lo.melds; defDead = lo.deadwood; laid = lo.laid; }
+    const defDw = sum(defDead);
+    let winner, pts, title;
+    if (gin) { winner = knocker; pts = 25 + defDw; title = `${knocker.name} went Gin! 🎉`; }
+    else if (kb.dw < defDw) { winner = knocker; pts = defDw - kb.dw; title = `${knocker.name} knocked and won the hand`; }
+    else { winner = def; pts = 25 + (kb.dw - defDw); title = `${def.name} undercut ${knocker.name}! 😮`; }
+    winner.score += pts;
+    let text = gin ? `25 Gin bonus + ${def.name}'s ${defDw} deadwood = ${pts} points to ${winner.name}.`
+      : winner === knocker ? `${def.name}'s ${defDw} deadwood − ${knocker.name}'s ${kb.dw} = ${pts} points to ${winner.name}.`
+      : `${def.name} had ${defDw} deadwood vs ${knocker.name}'s ${kb.dw}. 25 undercut bonus + ${kb.dw - defDw} = ${pts} points to ${winner.name}.`;
+    this.addLog(`${title.replace(/ [🎉😮]$/, '')}: ${pts} points to ${winner.name}.`);
+    if (winner.score >= TARGET) { this.matchOver = true; text += ` ${winner.name} reaches ${winner.score} and wins the match! 🏆`; this.addLog(`🏆 ${winner.name} wins the match!`); }
+    this.result = {
+      title, text, laid,
+      reveal: {
+        [knocker.id]: { melds: kMelds, deadwood: kb.deadwood, dw: kb.dw, knocked: true },
+        [def.id]: { melds: db.melds, deadwood: defDead, dw: defDw }
       }
-    }
-  },
-  totalBooks() { return this.players.reduce((n, p) => n + p.books.length, 0); },
-
-  endGame() {
-    this.started = false;
-    const best = Math.max(...this.players.map(p => p.books.length));
-    const winners = this.players.filter(p => p.books.length === best).map(p => p.name);
-    this.winnerText = winners.length > 1
-      ? `It's a tie between ${winners.join(' and ')} with ${best} books!`
-      : `${winners[0]} wins with ${best} books!`;
-    this.addLog('🏆 ' + this.winnerText);
+    };
   },
 
-  // Move to the next player who can play. A player with no cards draws one if possible.
-  startTurn(index) {
-    for (let tries = 0; tries < this.players.length; tries++) {
-      const p = this.players[index % this.players.length];
-      if (p.hand.length === 0 && this.deck.length > 0) {
-        p.hand.push(this.deck.pop()); this.sortHand(p.hand);
-        this.addLog(`${p.name} had no cards and drew one.`);
-      }
-      if (p.hand.length > 0) { this.turn = index % this.players.length; return; }
-      index++;
-    }
-    this.endGame();
-  },
-
-  startGame() {
-    this.deck = this.newDeck();
-    const handSize = this.players.length <= 3 ? 7 : 5;
-    for (const p of this.players) {
-      p.hand = this.deck.splice(0, handSize); p.books = [];
-      this.sortHand(p.hand); this.checkBooks(p);
-    }
-    this.started = true; this.winnerText = ''; this.log = [];
-    this.addLog(`New game! ${handSize} cards each.`);
-    this.startTurn(Math.floor(Math.random() * this.players.length));
-  },
-
-  ask(asker, targetId, rank) {
-    if (!this.started || this.players[this.turn] !== asker) return;
-    const target = this.players.find(p => p.id === targetId);
-    if (!target || target === asker || !RANKS.includes(rank)) return;
-    if (!asker.hand.some(c => c.rank === rank)) return;
-
-    const got = target.hand.filter(c => c.rank === rank);
-    let goAgain = false;
-    if (got.length > 0) {
-      target.hand = target.hand.filter(c => c.rank !== rank);
-      asker.hand.push(...got);
-      this.addLog(`${asker.name} asked ${target.name} for ${rank}s and got ${got.length}! 🎉`);
-      goAgain = true;
-    } else {
-      this.addLog(`${asker.name} asked ${target.name} for ${rank}s. Go fish! 🐟`);
-      if (this.deck.length > 0) {
-        const card = this.deck.pop();
-        asker.hand.push(card);
-        if (card.rank === rank) { this.addLog(`${asker.name} fished the ${rank} they wanted and goes again!`); goAgain = true; }
-      } else {
-        this.addLog('The pond is empty.');
-      }
-    }
-    this.sortHand(asker.hand);
-    this.checkBooks(asker);
-    if (this.totalBooks() === 13) return this.endGame();
-    this.startTurn(goAgain ? this.turn : this.turn + 1);
-  },
-
-  // Each player gets a view that hides everyone else's cards.
   broadcast() {
     for (const p of this.players) {
       const v = {
-        type: 'state', you: p.id, hostId: 'host',
-        started: this.started, winnerText: this.winnerText, log: this.log,
-        deckCount: this.deck.length,
-        turnId: this.started ? this.players[this.turn]?.id : null,
-        hand: p.hand,
-        players: this.players.map(o => ({ id: o.id, name: o.name, cardCount: o.hand.length, books: o.books }))
+        type: 'state', you: p.id, started: this.started, matchOver: this.matchOver,
+        players: this.players.map(o => ({ id: o.id, name: o.name, score: o.score, cardCount: o.hand.length })),
+        hand: p.hand, stockCount: this.stock.length, discardTop: this.pile[this.pile.length - 1] || null,
+        turnId: this.started ? this.players[this.turn]?.id : null, dealerId: this.started ? this.players[this.dealer]?.id : null,
+        phase: this.phase, cantDiscard: this.cantDiscard, result: this.result, log: this.log
       };
       if (p.id === 'host') { view = v; render(); }
       else if (p.conn && p.conn.open) p.conn.send(v);
@@ -326,57 +447,104 @@ const host = {
 // =====================================================================
 // Drawing the table
 // =====================================================================
+function cardHTML(c, cls = '', style = '') {
+  if (!c) return `<div class="card back ${cls}" style="${style}"></div>`;
+  const red = c.s === '♥' || c.s === '♦';
+  return `<div class="card ${red ? 'red' : ''} ${cls}" data-id="${cid(c)}" style="${style}"><span class="corner">${c.r}<br>${c.s}</span><span class="s2">${c.s}</span></div>`;
+}
+const fanStyle = (i, n, flip) => {
+  const mid = (n - 1) / 2, off = i - mid;
+  return `transform: rotate(${(flip ? -1 : 1) * off * 2.2}deg) translateY(${(flip ? -1 : 1) * Math.abs(off) * Math.abs(off) * 0.6}px);`;
+};
+
+function plate(p, isTurn, isDealer, you) {
+  return `<span>${esc(p.name)}${you ? ' (you)' : ''}</span>${isDealer ? '<span class="chip" title="Dealer">D</span>' : ''}<span class="score">${p.score}</span>`;
+}
+
 function render() {
   const s = view; if (!s) return;
-  const myTurn = s.started && s.turnId === s.you;
-  const nameOf = (id) => s.players.find(p => p.id === id)?.name || '';
-  if (!myTurn) { pickRank = null; pickTarget = null; }
+  const me = s.players.find(p => p.id === s.you), opp = s.players.find(p => p.id !== s.you);
+  const mine = myTurn();
+  if (!mine || s.phase !== 'discard') selected = null;
 
+  $('start').classList.toggle('hidden', !isHost || s.started);
+  $('start').disabled = s.players.length < 2;
+
+  // Opponent seat (top)
+  $('oppPlate').className = 'plate' + (opp && s.turnId === opp.id && !s.result ? ' turn' : '');
+  $('oppPlate').innerHTML = opp ? plate(opp, false, s.dealerId === opp.id, false) : '<span>Empty seat</span>';
+  const oc = opp ? opp.cardCount : 0;
+  $('oppHand').innerHTML = Array.from({ length: oc }, (_, i) => cardHTML(null, '', fanStyle(i, oc, true))).join('');
+
+  // Piles (center)
+  const sc = s.stockCount;
+  $('stock').className = 'stack' + (sc ? '' : ' empty') + (canDraw() && sc ? ' live' : '');
+  $('stock').innerHTML = Array.from({ length: Math.min(sc, 5) }, (_, i) => cardHTML(null, '', `top:${-i * 2}px;left:${i}px`)).join('');
+  $('stockLabel').textContent = s.started ? `Deck (${sc})` : 'Deck';
+  $('discard').className = 'stack' + (s.discardTop ? '' : ' empty') + (canDraw() && s.discardTop ? ' live' : '');
+  $('discard').innerHTML = s.discardTop ? cardHTML(s.discardTop) : '';
+
+  // My hand (bottom): melds first, then deadwood
+  const hand = s.hand || [];
+  const b = hand.length ? best(hand) : { melds: [], deadwood: [], dw: 0 };
+  const ordered = [];
+  b.melds.forEach(m => m.forEach((c, i) => ordered.push({ c, meld: true, gap: i === 0 && ordered.length > 0 })));
+  b.deadwood.forEach((c, i) => ordered.push({ c, meld: false, gap: i === 0 && ordered.length > 0 }));
+  const prevIds = new Set(prevHand.map(cid));
+  const newest = prevHand.length && hand.length > prevHand.length ? hand.find(c => !prevIds.has(cid(c))) : null;
+  prevHand = hand.slice();
+  const canPick = mine && s.phase === 'discard';
+  $('myHand').innerHTML = ordered.map((o, i) => {
+    const id = cid(o.c);
+    const cls = [o.meld ? 'meld' : '', o.gap ? 'gap' : '', canPick && id !== s.cantDiscard ? 'clickable' : '',
+      id === selected ? 'selected' : '', newest && id === cid(newest) ? 'new' : ''].join(' ');
+    return cardHTML(o.c, cls, fanStyle(i, ordered.length, false));
+  }).join('');
+  for (const el of $('myHand').querySelectorAll('.card.clickable')) {
+    el.onclick = () => { selected = selected === el.dataset.id ? null : el.dataset.id; render(); };
+  }
+  $('myPlate').className = 'plate' + (me && s.turnId === me.id && !s.result ? ' turn' : '');
+  $('myPlate').innerHTML = me ? plate(me, false, s.dealerId === me.id, true) : '';
+
+  // Controls
+  let afterDw = null;
+  if (selected) afterDw = best(hand.filter(c => cid(c) !== selected)).dw;
+  $('dw').textContent = !s.started ? '' : selected ? `Deadwood after discarding: ${afterDw}` : `Your deadwood: ${b.dw}`;
+  $('dw').classList.toggle('hidden', !s.started);
+  $('discardBtn').disabled = !selected;
+  $('knockBtn').disabled = !(selected && afterDw <= 10);
+  $('knockBtn').textContent = selected && afterDw === 0 ? 'Gin!' : 'Knock';
+  $('discardBtn').classList.toggle('hidden', !s.started);
+  $('knockBtn').classList.toggle('hidden', !s.started);
+
+  // Status message
   const msg = $('msg');
-  msg.className = 'msg' + (myTurn ? ' you' : '');
-  const hostName = nameOf(s.hostId);
-  if (s.winnerText) msg.textContent = '🏆 ' + s.winnerText + (isHost ? ' Press Start to play again.' : ` Waiting for ${hostName} to start another.`);
-  else if (!s.started) {
-    if (s.players.length < 2) msg.textContent = 'Waiting for friends… send them the room code or invite link.';
-    else msg.textContent = isHost ? `${s.players.length} players here. Press Start when everyone has joined.` : `${s.players.length} players here. Waiting for ${hostName} to start.`;
-  }
-  else if (myTurn) msg.textContent = 'Your turn! Pick a card, then pick a player to ask.';
-  else msg.textContent = `Waiting for ${nameOf(s.turnId)}…`;
+  msg.className = 'msg' + (mine ? ' you' : '');
+  if (!s.started) msg.textContent = !opp ? 'Waiting for your opponent… send them the room code or invite link.'
+    : isHost ? `${opp.name} is here. Press Start match!` : `Waiting for ${opp.name} to start the match.`;
+  else if (s.result) msg.textContent = 'Hand over.';
+  else if (mine && s.phase === 'draw') msg.textContent = 'Your turn: draw from the deck or take the discard.';
+  else if (mine) msg.textContent = s.cantDiscard ? `Pick a card to discard (not the ${s.cantDiscard} you just took).` : 'Pick a card to discard, or knock if your deadwood is 10 or less.';
+  else msg.textContent = `${opp ? opp.name : 'Opponent'} is ${s.phase === 'draw' ? 'drawing' : 'choosing a discard'}…`;
 
-  $('start').classList.toggle('hidden', !isHost);
-  $('start').disabled = s.started || s.players.length < 2;
-  $('pond').textContent = s.started ? `🌊 Pond: ${s.deckCount} cards` : '';
+  // End-of-hand overlay
+  if (s.result) {
+    const r = s.result, laid = new Set(r.laid);
+    const showHand = (p) => {
+      const h = r.reveal[p.id]; if (!h) return '';
+      const groups = h.melds.map(m => `<div class="group">${m.map(c => cardHTML(c, 'mini ' + (laid.has(cid(c)) ? 'layoff' : 'meld'))).join('')}</div>`);
+      if (h.deadwood.length) groups.push(`<div><div class="group">${h.deadwood.map(c => cardHTML(c, 'mini')).join('')}</div><div class="label">deadwood: ${h.dw}</div></div>`);
+      return `<div class="who">${esc(p.name)}${p.id === s.you ? ' (you)' : ''}${h.knocked ? ' — knocked' : ''}</div><div class="groups">${groups.join('') || '<i>no cards</i>'}</div>`;
+    };
+    const scores = s.players.map(p => `${esc(p.name)}: <b>${p.score}</b>`).join(' &nbsp;·&nbsp; ');
+    const btn = isHost ? `<button id="nextBtn">${s.matchOver ? 'New match' : 'Next hand'}</button>` : `<i>Waiting for ${esc(s.players.find(p => p.id === 'host')?.name || 'host')} to deal the next hand…</i>`;
+    $('result').innerHTML = `<h3>${esc(r.title)}</h3><div>${esc(r.text)}</div>${s.players.map(showHand).join('')}
+      ${r.laid.length ? '<div class="label" style="margin-top:6px">Blue cards were laid off onto the knocker\'s melds.</div>' : ''}
+      <div class="scores">${scores} &nbsp;(first to ${TARGET})</div>${btn}`;
+    $('overlay').classList.remove('hidden');
+  } else $('overlay').classList.add('hidden');
 
-  const pl = $('players'); pl.innerHTML = '';
-  for (const p of s.players) {
-    const d = document.createElement('div');
-    const pickable = myTurn && p.id !== s.you;
-    d.className = 'player' + (p.id === s.turnId ? ' turn' : '') + (pickable ? ' pickable' : '') + (p.id === pickTarget ? ' selected' : '');
-    d.innerHTML = `<div class="name">${esc(p.name)}${p.id === s.you ? ' (you)' : ''}${p.id === s.hostId ? ' 👑' : ''}</div>
-      <div class="info">🂠 ${p.cardCount} cards · 📚 ${p.books.length} books</div>
-      <div class="info">${p.books.join(' ')}</div>`;
-    if (pickable) d.onclick = () => { pickTarget = p.id; render(); };
-    pl.appendChild(d);
-  }
-
-  const h = $('hand'); h.innerHTML = '';
-  for (const c of s.hand) {
-    const d = document.createElement('div');
-    const red = c.suit === '♥' || c.suit === '♦';
-    d.className = 'card' + (red ? ' red' : '') + (myTurn ? ' clickable' : '') + (c.rank === pickRank ? ' selected' : '');
-    d.innerHTML = `<span>${c.rank}</span><span class="suit">${c.suit}</span>`;
-    if (myTurn) d.onclick = () => { pickRank = c.rank; render(); };
-    h.appendChild(d);
-  }
-  if (!s.hand.length) h.innerHTML = '<span style="opacity:.7">No cards</span>';
-
-  const ask = $('ask');
-  ask.disabled = !(myTurn && pickRank && pickTarget);
-  ask.textContent = pickRank && pickTarget ? `Ask ${nameOf(pickTarget)} for ${pickRank}s` : 'Ask';
-
-  const lg = $('log');
-  lg.innerHTML = s.log.map(esc).join('<br>');
-  lg.scrollTop = lg.scrollHeight;
+  const lg = $('log'); lg.innerHTML = s.log.map(esc).join('<br>'); lg.scrollTop = lg.scrollHeight;
 }
 function esc(t) { return String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 </script>
