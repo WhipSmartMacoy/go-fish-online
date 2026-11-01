@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Go Fish Online</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #0f5132; color: #f4f4f4; min-height: 100vh; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h1 { margin: 0 0 12px; font-size: 26px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  input { padding: 8px 10px; border-radius: 6px; border: none; font-size: 15px; }
+  button { padding: 8px 14px; border-radius: 6px; border: none; font-size: 15px; cursor: pointer; background: #ffc107; color: #222; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .msg { background: rgba(0,0,0,.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 16px; }
+  .msg.you { background: #ffc107; color: #222; font-weight: 600; }
+  .players { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .player { background: rgba(0,0,0,.25); border: 2px solid transparent; border-radius: 10px; padding: 10px 12px; min-width: 140px; }
+  .player.turn { border-color: #ffc107; }
+  .player.pickable { cursor: pointer; background: rgba(255,255,255,.12); }
+  .player.pickable:hover, .player.selected { border-color: #fff; background: rgba(255,255,255,.22); }
+  .player .name { font-weight: 700; }
+  .player .info { font-size: 13px; opacity: .85; margin-top: 4px; }
+  .section-title { font-size: 14px; opacity: .8; margin: 6px 0; text-transform: uppercase; letter-spacing: .05em; }
+  .hand { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; min-height: 92px; }
+  .card { width: 60px; height: 86px; background: #fff; color: #222; border-radius: 7px; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 6px; font-weight: 700; font-size: 17px; box-shadow: 0 2px 4px rgba(0,0,0,.3); user-select: none; border: 3px solid transparent; }
+  .card .suit { align-self: flex-end; font-size: 22px; }
+  .card.red { color: #c62828; }
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { transform: translateY(-4px); }
+  .card.selected { border-color: #ffc107; transform: translateY(-6px); }
+  .log { background: rgba(0,0,0,.25); border-radius: 8px; padding: 10px 14px; height: 180px; overflow-y: auto; font-size: 14px; line-height: 1.5; }
+  .rules { font-size: 13px; opacity: .8; margin-top: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐟 Go Fish Online</h1>
+  <div class="bar">
+    <input id="name" placeholder="Your name" maxlength="16">
+    <button id="setName">Set name</button>
+    <button id="start">Start game</button>
+    <span id="pond"></span>
+  </div>
+  <div id="msg" class="msg">Connecting…</div>
+  <div class="section-title">Players</div>
+  <div id="players" class="players"></div>
+  <div class="section-title">Your hand</div>
+  <div id="hand" class="hand"></div>
+  <div class="bar"><button id="ask" disabled>Ask</button></div>
+  <div class="section-title">What happened</div>
+  <div id="log" class="log"></div>
+  <div class="rules">
+    <b>How to play:</b> On your turn, click a card in your hand, then click another player, then press Ask.
+    If they have that rank, they give you all of them and you go again. If not, you "go fish" and draw a card.
+    Collect all four of a rank to make a book. When all 13 books are made, the player with the most books wins.
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${proto}://${location.host}`);
+let state = null, pickRank = null, pickTarget = null;
+
+const send = (o) => ws.readyState === 1 && ws.send(JSON.stringify(o));
+ws.onmessage = (e) => {
+  const m = JSON.parse(e.data);
+  if (m.type === 'error') { $('msg').textContent = m.message; return; }
+  if (m.type === 'state') { state = m; render(); }
+};
+ws.onclose = () => { if (!state || $('msg').textContent === 'Connecting…') return; $('msg').textContent = 'Disconnected. Refresh to rejoin.'; };
+
+$('setName').onclick = () => { const n = $('name').value.trim(); if (n) send({ type: 'name', name: n }); };
+$('name').onkeydown = (e) => { if (e.key === 'Enter') $('setName').click(); };
+$('start').onclick = () => send({ type: 'start' });
+$('ask').onclick = () => {
+  if (pickRank && pickTarget) send({ type: 'ask', rank: pickRank, targetId: pickTarget });
+  pickRank = pickTarget = null;
+};
+
+function render() {
+  const s = state, myTurn = s.started && s.turnId === s.you;
+  const nameOf = (id) => s.players.find(p => p.id === id)?.name || '';
+  if (!myTurn) { pickRank = null; pickTarget = null; }
+
+  // Status message
+  const msg = $('msg');
+  msg.className = 'msg' + (myTurn ? ' you' : '');
+  if (s.winnerText) msg.textContent = '🏆 ' + s.winnerText + ' Press Start to play again.';
+  else if (!s.started) msg.textContent = s.players.length < 2 ? 'Waiting for another player… share this page\'s link with a friend.' : `${s.players.length} players at the table. Anyone can press Start.`;
+  else if (myTurn) msg.textContent = 'Your turn! Pick a card, then pick a player to ask.';
+  else msg.textContent = `Waiting for ${nameOf(s.turnId)}…`;
+
+  $('start').disabled = s.started || s.players.length < 2;
+  $('pond').textContent = s.started ? `🌊 Pond: ${s.deckCount} cards` : '';
+
+  // Players
+  const pl = $('players'); pl.innerHTML = '';
+  for (const p of s.players) {
+    const d = document.createElement('div');
+    const pickable = myTurn && p.id !== s.you;
+    d.className = 'player' + (p.id === s.turnId ? ' turn' : '') + (pickable ? ' pickable' : '') + (p.id === pickTarget ? ' selected' : '');
+    d.innerHTML = `<div class="name">${esc(p.name)}${p.id === s.you ? ' (you)' : ''}</div>
+      <div class="info">🂠 ${p.cardCount} cards · 📚 ${p.books.length} books</div>
+      <div class="info">${p.books.join(' ')}</div>`;
+    if (pickable) d.onclick = () => { pickTarget = p.id; render(); };
+    pl.appendChild(d);
+  }
+
+  // Hand
+  const h = $('hand'); h.innerHTML = '';
+  for (const c of s.hand) {
+    const d = document.createElement('div');
+    const red = c.suit === '♥' || c.suit === '♦';
+    d.className = 'card' + (red ? ' red' : '') + (myTurn ? ' clickable' : '') + (c.rank === pickRank ? ' selected' : '');
+    d.innerHTML = `<span>${c.rank}</span><span class="suit">${c.suit}</span>`;
+    if (myTurn) d.onclick = () => { pickRank = c.rank; render(); };
+    h.appendChild(d);
+  }
+  if (!s.hand.length) h.innerHTML = '<span style="opacity:.7">No cards</span>';
+
+  const ask = $('ask');
+  ask.disabled = !(myTurn && pickRank && pickTarget);
+  ask.textContent = pickRank && pickTarget ? `Ask ${nameOf(pickTarget)} for ${pickRank}s` : 'Ask';
+
+  // Log
+  const lg = $('log');
+  lg.innerHTML = s.log.map(esc).join('<br>');
+  lg.scrollTop = lg.scrollHeight;
+}
+function esc(t) { return String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+</script>
+</body>
+</html>
